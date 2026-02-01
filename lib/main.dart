@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:qrcode/%20core/di/injection.dart';
+import 'package:qrcode/features/presentation/cubits/qr_generator/qr_generator_cubit.dart' ;
 import ' core/prefs/preferences_service.dart';
-import 'data/models/qr_item_model.dart';
-import 'presentation/cubits/history/history_cubit.dart';
-import 'presentation/cubits/qr_generator/qr_generator_cubit.dart';
-import 'presentation/cubits/qr_scanner/qr_scanner_cubit.dart';
-import 'presentation/screens/onboarding/onboarding_screen.dart';
-import 'presentation/screens/home/main_screen.dart';
+import 'features/data/models/qr_item_model.dart';
+import 'features/presentation/cubits/history/history_cubit.dart';
+import 'features/presentation/cubits/qr_scanner/qr_scanner_cubit.dart';
+import 'features/presentation/screens/home/main_screen.dart';
+import 'features/presentation/screens/onboarding/onboarding_screen.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

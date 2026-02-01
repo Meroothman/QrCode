@@ -1,18 +1,17 @@
 import 'package:get_it/get_it.dart';
 import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import '../../data/datasources/qr_local_datasource.dart';
-import '../../data/models/qr_item_model.dart';
-import '../../data/repositories/qr_repository_impl.dart';
-import '../../domain/repositories/qr_repository.dart';
-import '../../domain/usecases/add_qr_item.dart';
-import '../../domain/usecases/clear_all_history.dart';
-import '../../domain/usecases/delete_qr_item.dart';
-import '../../domain/usecases/get_history.dart';
-import '../../presentation/cubits/history/history_cubit.dart';
-import '../../presentation/cubits/qr_generator/qr_generator_cubit.dart';
-import '../../presentation/cubits/qr_scanner/qr_scanner_cubit.dart';
+import '../../features/data/datasources/qr_local_datasource.dart';
+import '../../features/data/models/qr_item_model.dart';
+import '../../features/data/repositories/qr_repository_impl.dart';
+import '../../features/domain/repositories/qr_repository.dart';
+import '../../features/domain/usecases/add_qr_item.dart';
+import '../../features/domain/usecases/clear_all_history.dart';
+import '../../features/domain/usecases/delete_qr_item.dart';
+import '../../features/domain/usecases/get_history.dart';
+import '../../features/presentation/cubits/history/history_cubit.dart';
+import '../../features/presentation/cubits/qr_generator/qr_generator_cubit.dart';
+import '../../features/presentation/cubits/qr_scanner/qr_scanner_cubit.dart';
 import '../prefs/preferences_service.dart';
 
 final getIt = GetIt.instance;
