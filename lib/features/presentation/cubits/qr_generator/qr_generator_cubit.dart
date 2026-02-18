@@ -4,13 +4,16 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../ core/constants/app_constants.dart';
 import '../../../domain/entities/qr_item.dart';
 import '../../../domain/usecases/add_qr_item.dart';
+import '../../../domain/usecases/get_history.dart';
 
 part 'qr_generator_state.dart';
 
 class QRGeneratorCubit extends Cubit<QRGeneratorState> {
   final AddQRItem addQRItem;
+  final GetHistory getHistory;
 
-  QRGeneratorCubit(this.addQRItem) : super(const QRGeneratorInitial());
+  QRGeneratorCubit(this.addQRItem, this.getHistory)
+    : super(const QRGeneratorInitial());
 
   Future<void> generateQRCode(String content) async {
     if (content.trim().isEmpty) {
@@ -19,6 +22,22 @@ class QRGeneratorCubit extends Cubit<QRGeneratorState> {
     }
 
     emit(const QRGeneratorLoading());
+
+    // Check for duplicate before adding
+    final historyResult = await getHistory();
+    final isDuplicate = historyResult.fold(
+      (_) => false,
+      (items) => items.any(
+        (item) =>
+            item.content == content && item.type == AppConstants.generateType,
+      ),
+    );
+
+    // If duplicate, still show QR but skip adding to history
+    if (isDuplicate) {
+      emit(QRGeneratorSuccess(content));
+      return;
+    }
 
     final item = QRItem(
       content: content,

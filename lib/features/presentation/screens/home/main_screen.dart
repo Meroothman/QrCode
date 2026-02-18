@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../../ core/constants/app_constants.dart';
 import '../generator/qr_generator_screen.dart';
 import '../history/history_screen.dart';
@@ -14,10 +15,11 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 1; // Start with scanner (middle)
   final GlobalKey<QRGeneratorScreenState> _generatorKey = GlobalKey();
+  final GlobalKey<QRScannerScreenState> _scannerKey = GlobalKey();
 
   late final List<Widget> _screens = [
     QRGeneratorScreen(key: _generatorKey),
-    const QRScannerScreen(),
+    QRScannerScreen(key: _scannerKey),
     const HistoryScreen(),
   ];
 
@@ -26,6 +28,17 @@ class _MainScreenState extends State<MainScreen> {
     if (_currentIndex == 0 && newIndex != 0) {
       _generatorKey.currentState?.clearAll();
     }
+
+    // If leaving scanner screen (index 1), stop camera
+    if (_currentIndex == 1 && newIndex != 1) {
+      _scannerKey.currentState?.stopCamera();
+    }
+
+    // If entering scanner screen (index 1), start camera
+    if (_currentIndex != 1 && newIndex == 1) {
+      _scannerKey.currentState?.startCamera();
+    }
+
     setState(() => _currentIndex = newIndex);
   }
 
@@ -100,7 +113,7 @@ class _MainScreenState extends State<MainScreen> {
     return GestureDetector(
       onTap: () => _onTabChanged(index),
       child: Transform.translate(
-        offset: const Offset(0, -10), // Lift it up a bit
+        offset: const Offset(0, -10),
         child: Container(
           width: 65,
           height: 65,

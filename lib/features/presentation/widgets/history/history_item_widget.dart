@@ -13,11 +13,13 @@ import 'detail_dialog.dart';
 class HistoryItemWidget extends StatelessWidget {
   final QRItem item;
   final int index;
+  final bool isSelectionMode;
 
   const HistoryItemWidget({
     super.key,
     required this.item,
     required this.index,
+    this.isSelectionMode = false,
   });
 
   @override
@@ -35,8 +37,8 @@ class HistoryItemWidget extends StatelessWidget {
         leading: _buildLeadingIcon(),
         title: _buildTitle(isLink),
         subtitle: _buildSubtitle(),
-        trailing: _buildTrailingActions(context, isLink, isGenerated),
-        onTap: () => _showDetailDialog(context),
+        trailing: isSelectionMode ? null : _buildTrailingActions(context, isLink, isGenerated),
+        onTap: isSelectionMode ? null : () => _showDetailDialog(context),
       ),
     );
   }
@@ -96,11 +98,7 @@ class HistoryItemWidget extends StatelessWidget {
         if (isGenerated)
           IconButton(
             onPressed: () => _showQRCodeDialog(context),
-            icon: const Icon(
-              Icons.qr_code,
-              color: AppColors.primary,
-              size: 20,
-            ),
+            icon: const Icon(Icons.qr_code, color: AppColors.primary, size: 20),
           ),
         IconButton(
           onPressed: () => _showDeleteDialog(context),

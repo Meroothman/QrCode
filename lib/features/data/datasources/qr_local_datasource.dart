@@ -4,8 +4,11 @@ import '../models/qr_item_model.dart';
 abstract class QRLocalDataSource {
   Future<List<QRItemModel>> getHistory();
   Future<void> addQRItem(QRItemModel item);
-  Future<void> deleteQRItem(int index);
+  Future<void> deleteQRItem(dynamic key);
   Future<void> clearAllHistory();
+
+  /// Returns items paired with their actual Hive keys — guaranteed same order.
+  Future<List<MapEntry<dynamic, QRItemModel>>> getHistoryWithKeys();
 }
 
 class QRLocalDataSourceImpl implements QRLocalDataSource {
@@ -32,9 +35,9 @@ class QRLocalDataSourceImpl implements QRLocalDataSource {
   }
 
   @override
-  Future<void> deleteQRItem(int index) async {
+  Future<void> deleteQRItem(dynamic key) async {
     try {
-      await box.deleteAt(index);
+      await box.delete(key);
     } catch (e) {
       throw Exception('Failed to delete QR item: $e');
     }
@@ -46,6 +49,16 @@ class QRLocalDataSourceImpl implements QRLocalDataSource {
       await box.clear();
     } catch (e) {
       throw Exception('Failed to clear history: $e');
+    }
+  }
+
+  /// Uses box.toMap() so key and value are guaranteed paired correctly.
+  @override
+  Future<List<MapEntry<dynamic, QRItemModel>>> getHistoryWithKeys() async {
+    try {
+      return box.toMap().entries.toList();
+    } catch (e) {
+      throw Exception('Failed to load history with keys: $e');
     }
   }
 }

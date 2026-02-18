@@ -17,12 +17,13 @@ class HistoryLoading extends HistoryState {
 
 class HistoryLoaded extends HistoryState {
   final List<QRItem> items;
+  final List<dynamic> keys; // actual Hive keys matching items order
   final String? filter;
 
-  const HistoryLoaded(this.items, {this.filter});
+  const HistoryLoaded(this.items, {required this.keys, this.filter});
 
   @override
-  List<Object?> get props => [items, filter];
+  List<Object?> get props => [items, keys, filter];
 }
 
 class HistoryError extends HistoryState {

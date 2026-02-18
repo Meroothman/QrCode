@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../ core/constants/app_constants.dart';
 import '../../cubits/history/history_cubit.dart';
@@ -17,6 +17,8 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen>
     with AutomaticKeepAliveClientMixin {
   String _selectedTab = AppConstants.scanType;
+  bool _isSelectionMode = false;
+  final Set<int> _selectedIndices = {};
 
   @override
   bool get wantKeepAlive => true;
@@ -24,35 +26,106 @@ class _HistoryScreenState extends State<HistoryScreen>
   @override
   void initState() {
     super.initState();
-    // Load history with scan filter on first load
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<HistoryCubit>().filterHistory(AppConstants.scanType);
     });
   }
 
+  void _exitSelectionMode() {
+    setState(() {
+      _isSelectionMode = false;
+      _selectedIndices.clear();
+    });
+  }
+
+  void _toggleSelection(int index) {
+    setState(() {
+      if (_selectedIndices.contains(index)) {
+        _selectedIndices.remove(index);
+        if (_selectedIndices.isEmpty) {
+          _isSelectionMode = false;
+        }
+      } else {
+        _selectedIndices.add(index);
+      }
+    });
+  }
+
+  void _selectAll() {
+    final state = context.read<HistoryCubit>().state;
+    if (state is HistoryLoaded) {
+      setState(() {
+        _selectedIndices.clear();
+        _selectedIndices.addAll(List.generate(state.items.length, (i) => i));
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Scaffold(
-      backgroundColor: AppColors.darkBackground,
-      appBar: _buildAppBar(),
-      body: Column(
-        children: [
-          FilterTabsWidget(
-            selectedTab: _selectedTab,
-            onTabChanged: _onTabChanged,
-          ),
-          Expanded(
-            child: BlocBuilder<HistoryCubit, HistoryState>(
-              builder: _buildHistoryContent,
+    return WillPopScope(
+      onWillPop: () async {
+        if (_isSelectionMode) {
+          _exitSelectionMode();
+          return false;
+        }
+        return true;
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.darkBackground,
+        appBar: _buildAppBar(),
+        body: Column(
+          children: [
+            if (!_isSelectionMode)
+              FilterTabsWidget(
+                selectedTab: _selectedTab,
+                onTabChanged: _onTabChanged,
+              ),
+            Expanded(
+              child: BlocBuilder<HistoryCubit, HistoryState>(
+                builder: _buildHistoryContent,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  AppBar _buildAppBar() {
+  PreferredSizeWidget _buildAppBar() {
+    if (_isSelectionMode) {
+      return AppBar(
+        backgroundColor: AppColors.primary,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: AppColors.black),
+          onPressed: _exitSelectionMode,
+        ),
+        title: Text(
+          '${_selectedIndices.length} selected',
+          style: const TextStyle(color: AppColors.black),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.select_all, color: AppColors.black),
+            onPressed: _selectAll,
+            tooltip: 'Select All',
+          ),
+          IconButton(
+            icon: const Icon(Icons.share, color: AppColors.black),
+            onPressed: _selectedIndices.isEmpty ? null : _shareSelected,
+            tooltip: 'Share Selected',
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete, color: AppColors.black),
+            onPressed: _selectedIndices.isEmpty ? null : _deleteSelected,
+            tooltip: 'Delete Selected',
+          ),
+        ],
+      );
+    }
+
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -65,12 +138,31 @@ class _HistoryScreenState extends State<HistoryScreen>
           icon: const Icon(Icons.more_vert, color: AppColors.white),
           color: AppColors.background,
           onSelected: _handleMenuAction,
-          itemBuilder: (context) => const [
-            PopupMenuItem(
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'share_all',
+              child: Row(
+                children: [
+                  Icon(Icons.share, color: AppColors.primary, size: 20),
+                  SizedBox(width: 12),
+                  Text(
+                    'Share All Scanned',
+                    style: TextStyle(color: AppColors.white),
+                  ),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
               value: 'clear_all',
-              child: Text(
-                AppStrings.clearAllHistory,
-                style: TextStyle(color: AppColors.white),
+              child: Row(
+                children: [
+                  Icon(Icons.delete_sweep, color: AppColors.red, size: 20),
+                  SizedBox(width: 12),
+                  Text(
+                    AppStrings.clearAllHistory,
+                    style: TextStyle(color: AppColors.white),
+                  ),
+                ],
               ),
             ),
           ],
@@ -128,9 +220,45 @@ class _HistoryScreenState extends State<HistoryScreen>
         itemCount: state.items.length,
         padding: const EdgeInsets.only(bottom: 16),
         itemBuilder: (context, index) {
-          return HistoryItemWidget(
-            item: state.items[index],
-            index: index,
+          final isSelected = _selectedIndices.contains(index);
+          
+          return GestureDetector(
+            onLongPress: () {
+              if (!_isSelectionMode) {
+                setState(() {
+                  _isSelectionMode = true;
+                  _selectedIndices.add(index);
+                });
+              }
+            },
+            onTap: _isSelectionMode
+                ? () => _toggleSelection(index)
+                : null,
+            child: Container(
+              color: isSelected 
+                  ? AppColors.primary.withOpacity(0.2) 
+                  : Colors.transparent,
+              child: Row(
+                children: [
+                  if (_isSelectionMode)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16),
+                      child: Checkbox(
+                        value: isSelected,
+                        onChanged: (_) => _toggleSelection(index),
+                        activeColor: AppColors.primary,
+                      ),
+                    ),
+                  Expanded(
+                    child: HistoryItemWidget(
+                      item: state.items[index],
+                      index: index,
+                      isSelectionMode: _isSelectionMode,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           );
         },
       );
@@ -142,14 +270,110 @@ class _HistoryScreenState extends State<HistoryScreen>
   void _onTabChanged(String tab) {
     setState(() {
       _selectedTab = tab;
+      _isSelectionMode = false;
+      _selectedIndices.clear();
     });
     context.read<HistoryCubit>().filterHistory(tab);
   }
 
   void _handleMenuAction(String value) {
-    if (value == 'clear_all') {
+    if (value == 'share_all') {
+      _shareAllScanned();
+    } else if (value == 'clear_all') {
       _showClearAllDialog();
     }
+  }
+
+  void _shareSelected() {
+    final state = context.read<HistoryCubit>().state;
+    if (state is! HistoryLoaded) return;
+
+    final selectedItems = _selectedIndices
+        .map((index) => state.items[index])
+        .toList();
+
+    if (selectedItems.isEmpty) return;
+
+    final StringBuffer buffer = StringBuffer();
+    
+    for (int i = 0; i < selectedItems.length; i++) {
+      final item = selectedItems[i];
+      buffer.writeln('${i + 1}. ${item.content}');
+    }
+
+    Share.share(buffer.toString().trim());
+    _exitSelectionMode();
+  }
+
+  void _deleteSelected() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.background,
+        title: const Text(
+          'Delete Selected',
+          style: TextStyle(color: AppColors.white),
+        ),
+        content: Text(
+          'Delete ${_selectedIndices.length} selected items?',
+          style: const TextStyle(color: AppColors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text(
+              AppStrings.cancel,
+              style: TextStyle(color: AppColors.white54),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              
+              // Delete in reverse order to maintain correct indices
+              final sortedIndices = _selectedIndices.toList()..sort((a, b) => b.compareTo(a));
+              for (final index in sortedIndices) {
+                context.read<HistoryCubit>().deleteItem(index);
+              }
+              
+              _exitSelectionMode();
+            },
+            child: const Text(
+              AppStrings.delete,
+              style: TextStyle(color: AppColors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _shareAllScanned() {
+    final state = context.read<HistoryCubit>().state;
+    if (state is! HistoryLoaded) return;
+
+    final scannedItems = state.items
+        .where((item) => item.type == AppConstants.scanType)
+        .toList();
+
+    if (scannedItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No scanned QR codes to share'),
+          backgroundColor: AppColors.red,
+        ),
+      );
+      return;
+    }
+
+    final StringBuffer buffer = StringBuffer();
+    
+    for (int i = 0; i < scannedItems.length; i++) {
+      final item = scannedItems[i];
+      buffer.writeln('${i + 1}. ${item.content}');
+    }
+
+    Share.share(buffer.toString().trim());
   }
 
   void _showClearAllDialog() {

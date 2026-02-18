@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:qrcode/%20core/utils/toast_utils.dart' ;
 
 import '../../../../ core/constants/app_constants.dart';
+import '../../../../ core/utils/toast_utils.dart';
 import '../../cubits/history/history_cubit.dart';
 import '../../cubits/qr_scanner/qr_scanner_cubit.dart';
 import '../../widgets/scanner/scan_result_dialog.dart';
@@ -13,13 +13,14 @@ class QRScannerScreen extends StatefulWidget {
   const QRScannerScreen({super.key});
 
   @override
-  State<QRScannerScreen> createState() => _QRScannerScreenState();
+  State<QRScannerScreen> createState() => QRScannerScreenState();
 }
 
-class _QRScannerScreenState extends State<QRScannerScreen>
+class QRScannerScreenState extends State<QRScannerScreen>
     with AutomaticKeepAliveClientMixin {
   late MobileScannerController _controller;
   bool _isFlashOn = false;
+  bool _isDialogOpen = false;
   final ImagePicker _imagePicker = ImagePicker();
 
   @override
@@ -33,10 +34,27 @@ class _QRScannerScreenState extends State<QRScannerScreen>
 
   void _initializeController() {
     _controller = MobileScannerController(
-      detectionSpeed: DetectionSpeed.noDuplicates, // Reduces frame processing
+      detectionSpeed: DetectionSpeed.noDuplicates,
       facing: CameraFacing.back,
       torchEnabled: false,
     );
+  }
+
+  // Public methods to control camera from parent
+  void stopCamera() {
+    try {
+      _controller.stop();
+    } catch (e) {
+      // Camera might already be stopped
+    }
+  }
+
+  void startCamera() {
+    try {
+      _controller.start();
+    } catch (e) {
+      // Camera might already be started
+    }
   }
 
   @override
@@ -54,9 +72,16 @@ class _QRScannerScreenState extends State<QRScannerScreen>
   void _handleScannerState(BuildContext context, QRScannerState state) {
     if (state is QRScannerSuccess) {
       _controller.stop();
-      _showResultDialog(state.code);
-      // Refresh history with scan filter (since we just scanned something)
-      context.read<HistoryCubit>().filterHistory(AppConstants.scanType);
+      if (!_isDialogOpen) {
+        _isDialogOpen = true;
+        _showResultDialog(state.code);
+      }
+      final currentState = context.read<HistoryCubit>().state;
+      if (currentState is HistoryLoaded) {
+        context.read<HistoryCubit>().filterHistory(
+          currentState.filter ?? AppConstants.scanType,
+        );
+      }
     } else if (state is QRScannerError) {
       ToastUtils.showError(state.message, context: context);
       context.read<QRScannerCubit>().resetScanner();
@@ -65,13 +90,15 @@ class _QRScannerScreenState extends State<QRScannerScreen>
   }
 
   Widget _buildScannerBody() {
-    return Stack(
-      children: [
-        _buildScanner(),
-        _buildTopControls(),
-        _buildScanningFrame(),
-        _buildCornerOverlays(),
-      ],
+    return GestureDetector(
+      child: Stack(
+        children: [
+          _buildScanner(),
+          _buildTopControls(),
+          _buildScanningFrame(),
+          _buildCornerOverlays(),
+        ],
+      ),
     );
   }
 
@@ -81,6 +108,7 @@ class _QRScannerScreenState extends State<QRScannerScreen>
       onDetect: (capture) {
         final state = context.read<QRScannerCubit>().state;
         if (state is QRScannerProcessing) return;
+        if (_isDialogOpen) return;
 
         final barcode = capture.barcodes.firstOrNull;
         final code = barcode?.rawValue;
@@ -100,22 +128,12 @@ class _QRScannerScreenState extends State<QRScannerScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          IconButton(
-            onPressed: _pickImageFromGallery,
-            icon: const Icon(
-              Icons.photo_library,
-              color: AppColors.white,
-              size: 28,
-            ),
+          _buildControlButton(Icons.photo_library, _pickImageFromGallery),
+          _buildControlButton(
+            _isFlashOn ? Icons.flash_on : Icons.flash_off,
+            _toggleFlash,
           ),
-          IconButton(
-            onPressed: _toggleFlash,
-            icon: Icon(
-              _isFlashOn ? Icons.flash_on : Icons.flash_off,
-              color: AppColors.white,
-              size: 28,
-            ),
-          ),
+
           IconButton(
             onPressed: () {
               // Settings functionality can be added
@@ -124,6 +142,19 @@ class _QRScannerScreenState extends State<QRScannerScreen>
             icon: const Icon(Icons.settings, color: AppColors.white, size: 28),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildControlButton(IconData icon, VoidCallback onPressed) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.5),
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        onPressed: onPressed,
+        icon: Icon(icon, color: AppColors.white, size: 24),
       ),
     );
   }
@@ -211,13 +242,10 @@ class _QRScannerScreenState extends State<QRScannerScreen>
       final XFile? image = await _imagePicker.pickImage(
         source: ImageSource.gallery,
       );
-
       if (image != null) {
-        // Analyze the picked image for QR codes
         final BarcodeCapture? barcodes = await _controller.analyzeImage(
           image.path,
         );
-
         if (barcodes != null && barcodes.barcodes.isNotEmpty) {
           final code = barcodes.barcodes.first.rawValue;
           if (code != null && code.isNotEmpty) {
@@ -245,16 +273,28 @@ class _QRScannerScreenState extends State<QRScannerScreen>
   void _showResultDialog(String code) {
     showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => ScanResultDialog(
-        code: code,
-        onDismiss: () {
-          Navigator.pop(context);
-          context.read<QRScannerCubit>().resetScanner();
-          _controller.start();
+      barrierDismissible: true,
+      builder: (dialogContext) => PopScope(
+        canPop: false,
+        onPopInvoked: (didPop) {
+          if (!didPop) _dismissDialog(dialogContext);
         },
+        child: ScanResultDialog(
+          code: code,
+          onDismiss: () => _dismissDialog(dialogContext),
+        ),
       ),
     );
+  }
+
+  void _dismissDialog(BuildContext dialogContext) {
+    if (!_isDialogOpen) return;
+    _isDialogOpen = false;
+    if (dialogContext.mounted) Navigator.pop(dialogContext);
+    if (mounted) {
+      context.read<QRScannerCubit>().resetScanner();
+      _controller.start();
+    }
   }
 
   @override

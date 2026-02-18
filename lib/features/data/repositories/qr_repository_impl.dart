@@ -34,9 +34,9 @@ class QRRepositoryImpl implements QRRepository {
   }
 
   @override
-  Future<Either<Failure, void>> deleteQRItem(int index) async {
+  Future<Either<Failure, void>> deleteQRItem(dynamic key) async {
     try {
-      await localDataSource.deleteQRItem(index);
+      await localDataSource.deleteQRItem(key);
       return const Right(null);
     } catch (e) {
       return Left(CacheFailure('Failed to delete QR item: ${e.toString()}'));
@@ -50,6 +50,17 @@ class QRRepositoryImpl implements QRRepository {
       return const Right(null);
     } catch (e) {
       return Left(CacheFailure('Failed to clear history: ${e.toString()}'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<MapEntry<dynamic, QRItem>>>> getHistoryWithKeys() async {
+    try {
+      final entries = await localDataSource.getHistoryWithKeys();
+      final mapped = entries.map((e) => MapEntry(e.key, e.value.toEntity())).toList();
+      return Right(mapped);
+    } catch (e) {
+      return Left(CacheFailure('Failed to load history with keys: ${e.toString()}'));
     }
   }
 }
